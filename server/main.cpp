@@ -183,6 +183,7 @@ int TunInit() {
     // enable interface and nat
     system("ifconfig over6 " ADDRESS_PREFIX ".1 netmask 255.255.255.0 up");
     system("iptables -t nat -A POSTROUTING -s " ADDRESS_PREFIX ".0/24 -j MASQUERADE");
+	system("iptables -t nat -A POSTROUTING -o over6 -j MASQUERADE");
 
     return fd;
 }
