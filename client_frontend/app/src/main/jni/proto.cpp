@@ -1,9 +1,4 @@
-//
-// Created by chenyu on 2018/5/15.
-//
-
-#include "protocol.h"
-#include "common.h"
+#include "proto.h"
 #include <android/log.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -12,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <cstdio>
 
 using namespace std;
 
@@ -43,9 +39,8 @@ uint64_t out_bytes;
 uint64_t in_packets;
 uint64_t out_packets;
 
-int protocol_init(int _socketFd, int _commandReadFd, int _responseWriteFd)
-{
-    // 内存布局必须符合预期
+int protocol_init(int _socketFd, int _commandReadFd, int _responseWriteFd) {
+    // 内存布局
     ASSERT( &(( (Message*)(void*)(0) )->type) - (uint8_t*)(0) == 4, fail);
     ASSERT(sizeof(Message) == 5, fail);
 
@@ -74,7 +69,7 @@ int get_tun_fd()
     return tunFd;
 }
 
-int handle_tunel()
+int handle_tunnel()
 {
     static uint8_t buffer[BUFFER_SIZE];
     ssize_t size = read(tunFd, buffer, BUFFER_SIZE);
@@ -112,12 +107,10 @@ int handle_socket()
         LOGV("type = %d, length = %d", msg.type, msg.length);
 
         if (msg.type == PROTOCOL_IP_REPLY) {
-            LOGV("PROTOCOL_IP_REPLY");
-
             vector<char> data;
             data.resize(msg.length-sizeof(Message));
             memmove(data.data(), socket_buffer+sizeof(Message), msg.length-sizeof(Message));
-            LOGV("PROTOCOL_IP_REPLY: %s", data.data());
+            LOGV("IP_REPLY: %s", data.data());
 
             const char *ptr = data.data();
             uint8_t ip[4], mask[4], dns1[4], dns2[4], dns3[4];
@@ -134,16 +127,16 @@ int handle_socket()
             ASSERT(write(responseWriteFd, dns3, 4) == 4, fail);
             ASSERT(write(responseWriteFd, &socketFd, 4) == 4, fail);
         } else if (msg.type == PROTOCOL_HEARTBEAT) {
-            LOGV("PROTOCOL_HEARTBEAT");
+            LOGV("HEARTBEAT");
             last_heartbeat_from_server = time(NULL);
         } else if (msg.type == PROTOCOL_PACKET_RECV) {
-            LOGV("PROTOCOL_PACKET_RECV");
+            LOGV("PACKET_RECV");
             if (tunFd >= 0) {
                 ASSERT(write(tunFd, socket_buffer+sizeof(Message), msg.length) == msg.length, fail);
                 in_bytes += msg.length;
                 in_packets ++;
             } else {
-                LOGW("recved packet before set tunFd");
+                LOGW("recv'd packet before set tunFd");
             }
         } else {
             LOGW("unknow type = %d", msg.type);
@@ -166,17 +159,17 @@ int handle_command()
     ASSERT(ret == 1, fail);
 
     if (command == IPC_COMMAND_EXIT) {
-        LOGV("IPC_COMMAND_EXIT");
+        LOGV("COMMAND_EXIT");
         return 1;
     } else if (command == IPC_COMMAND_FETCH_CONFIG) {
-        LOGV("IPC_COMMAND_FETCH_CONFIG");
+        LOGV("COMMAND_FETCH_CONFIG");
 
         Message msg;
         msg.length = sizeof(Message);
         msg.type = PROTOCOL_IP_REQUEST;
         ASSERT(write(socketFd, &msg, sizeof(msg)) == sizeof(msg), fail);
     } else if (command == IPC_COMMAND_SET_TUN) {
-        LOGV("IPC_COMMAND_SET_TUN");
+        LOGV("COMMAND_SET_TUN");
 
         uint8_t *data = (uint8_t*)&tunFd;
         int nreads = 0;
@@ -188,7 +181,7 @@ int handle_command()
         LOGV("tunFd = %d", tunFd);
         ASSERT(tunFd >= 0, fail);
     } else if (command == IPC_COMMAND_FETCH_STATE) {
-        LOGV("IPC_COMMAND_FETCH_STATE");
+        LOGV("COMMAND_FETCH_STATE");
 
         ASSERT(write(responseWriteFd, &in_bytes, sizeof(uint64_t)) == sizeof(uint64_t), fail);
         ASSERT(write(responseWriteFd, &out_bytes, sizeof(uint64_t)) == sizeof(uint64_t), fail);
@@ -216,4 +209,14 @@ int handle_heartbeat()
     return 0;
     fail:
     return -1;
+}
+
+const char* READ_IP(const char* ptr, uint8_t ip[4])
+{
+    int ip_int[4];
+    sscanf(ptr, "%d.%d.%d.%d", &ip_int[0], &ip_int[1], &ip_int[2], &ip_int[3]);
+    for(int i = 0; i < 4; i ++) ip[i] = (uint8_t)ip_int[i];
+    ptr ++;
+    while (*ptr && *ptr != ' ') ptr++;
+    return ptr;
 }

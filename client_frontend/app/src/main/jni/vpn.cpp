@@ -1,10 +1,5 @@
-//
-// Created by chenyu on 2018/5/15.
-//
-
-#include "vpn_main.h"
-#include "protocol.h"
-#include "common.h"
+#include "vpn.h"
+#include "proto.h"
 #include <android/log.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -51,18 +46,17 @@ int vpn_main(const std::string hostname, int port, int commandReadFd, int respon
 
     for(;;) {
         fds.clear();
-        {
-            size_t i = fds.size();
-            fds.resize(i+1);
-            fds[i].fd = socketFd;
-        }
-        {
-            size_t i = fds.size();
-            fds.resize(i+1);
-            fds[i].fd = commandReadFd;
-        }
+
+        size_t i = fds.size();
+        fds.resize(i+1);
+        fds[i].fd = socketFd;
+
+        i = fds.size();
+        fds.resize(i+1);
+        fds[i].fd = commandReadFd;
+
         if (get_tun_fd() >= 0) {
-            size_t i = fds.size();
+            i = fds.size();
             fds.resize(i+1);
             fds[i].fd = get_tun_fd();
         }
@@ -74,7 +68,7 @@ int vpn_main(const std::string hostname, int port, int commandReadFd, int respon
         int ret = poll(fds.data(), fds.size(), 1000);
         ERROR_CHECK(ret, exit);
         if (handle_heartbeat() != 0) {
-            LOGI("exit because of heartbeat timeout");
+            LOGI("exit: heartbeat timeout");
             goto exit;
         }
 
@@ -87,11 +81,11 @@ int vpn_main(const std::string hostname, int port, int commandReadFd, int respon
             if (fds[i].fd == commandReadFd) {
                 int command = handle_command();
                 if (command == IPC_COMMAND_EXIT) {
-                    LOGI("exit because of exit command");
+                    LOGI("exit: exit command");
                     goto exit;
                 }
                 if (command < 0) {
-                    LOGE("exit because of handle_command command = %d", command);
+                    LOGE("exit: handle_command command = %d", command);
                     goto exit;
                 }
             }
@@ -99,7 +93,7 @@ int vpn_main(const std::string hostname, int port, int commandReadFd, int respon
                 ASSERT( handle_socket() == 0, exit);
             }
             if (fds[i].fd == get_tun_fd()) {
-                ASSERT( handle_tunel() == 0, exit);
+                ASSERT( handle_tunnel() == 0, exit);
             }
         }
     }

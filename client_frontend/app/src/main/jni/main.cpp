@@ -3,7 +3,7 @@
 //
 
 #include "com_example_a4over6_MyVpnService.h"
-#include "vpn_main.h"
+#include "vpn.h"
 
 JNIEXPORT jint JNICALL Java_com_example_a4over6_MyVpnService_vpn_1entry
   (JNIEnv *env, jobject instance, jstring hostName_, jint port, jint commandReadFd, jint responseWriteFd) {

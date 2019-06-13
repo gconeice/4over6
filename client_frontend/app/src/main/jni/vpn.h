@@ -1,7 +1,3 @@
-//
-// Created by chenyu on 2018/5/15.
-//
-
 #ifndef APP_VPN_MAIN_H
 #define APP_VPN_MAIN_H
 
